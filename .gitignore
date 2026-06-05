@@ -1,0 +1,26 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Development env files (Chứa mật khẩu, port cấu hình bảo mật)
+.env
+.env.local
+.env.development.local
+
+# IDEs and editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS Files
+.DS_Store
+Thumbs.db

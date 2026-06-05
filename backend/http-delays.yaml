@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: backend-http-delayyyyyy
+  namespace: default
+spec:
+  mode: all
+  selector:
+    labelSelectors:
+      app: backend-airplane
+  target: Request
+  port: 5000
+  delay: '3000ms'
+  path: '/api/tickets/book-ticket'
+  method: 'POST'
+  duration: '3m'
+  patch:
+    headers:
+      - [ "Connection", "close" ]

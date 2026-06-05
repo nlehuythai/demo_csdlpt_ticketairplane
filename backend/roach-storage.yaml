@@ -1,0 +1,7 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: roach-storage     # Tên của loại đĩa ảo bảo lưu mới
+provisioner: k8s.io/minikube-hostpath # Bảo lưu trực tiếp vào ổ cứng thật Windows thông qua Minikube
+reclaimPolicy: Retain     # Giữ lại data bằng mọi giá, xóa Pod không mất đĩa
+volumeBindingMode: Immediate

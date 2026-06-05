@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-airplane
+  labels:
+    app: backend-airplane
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-airplane
+  template:
+    metadata:
+      labels:
+        app: backend-airplane
+    spec: 
+      containers: 
+      - name: backend-container 
+        image: docker.io/library/backend-airplane:v2
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000

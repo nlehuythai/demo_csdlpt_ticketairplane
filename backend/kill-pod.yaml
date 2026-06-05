@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: roach-pod-kill-schedule
+  namespace: default
+spec:
+  schedule: '@every 45s'
+  concurrencyPolicy: Forbid
+  historyLimit: 3
+  type: PodChaos
+  podChaos:
+    action: pod-kill
+    mode: one
+    selector:
+      pods:                  # CÚ PHÁP OBJECT CHUẨN ĐỂ CHỈ ĐÍCH DANH TÊN
+        default:             # Đây là namespace (default)
+          - roach-0          # Tên chính xác của các Pod DB của bro
+          - roach-1
+          - roach-2

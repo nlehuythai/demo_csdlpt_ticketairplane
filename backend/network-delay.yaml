@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: backend-delay-xin     # ĐỔI TÊN Ở ĐÂY ĐỂ XÓA CACHE LỖI CŨ
+  namespace: default
+spec:
+  action: delay
+  mode: one
+  selector:
+    labelSelectors:
+      app: backend-airplane   # CHUẨN BẮT CON BACKEND
+  direction: to
+  delay:
+    latency: '3000ms'
+    correlation: '0'
+    jitter: '0ms'
+  duration: '3m'
