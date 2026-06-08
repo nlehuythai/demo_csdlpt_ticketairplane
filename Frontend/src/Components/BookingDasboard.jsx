@@ -12,7 +12,7 @@ const BookingDashboard = ({
     const [logs, setLogs] = useState([]);
     const [isAuto, setIsAuto] = useState(false);
     const [nodes, setNodes] = useState([]);
-    const BASE_URL = " http://127.0.0.1:60969";
+    const BASE_URL = " http://127.0.0.1:54725";
 
     // 🌟 SỬ DỤNG REF ĐỂ PHÁ VỠ STALE CLOSURE CỦA SETINTERVAL
     const flightsRef = useRef(flights);

@@ -139,7 +139,6 @@ const GetFlights = async (req, res) => {
 // 3. HÀM GIẢ LẬP ĐẶT VÉ NHANH (Atomic Update - Dùng cho Auto-Pilot)
 // =================================================================
 const BookFlightStimulate = async (req, res) => {
-    // Hàm này cập nhật theo cấu trúc mới: nhận flight_id, user_id và seat_number từ body
     const { flight_id, user_id, seat_number } = req.body;
 
     const MAX_RETRIES = 3;
@@ -152,36 +151,62 @@ const BookFlightStimulate = async (req, res) => {
             client = await pool.connect();
             await client.query('SET statement_timeout = 3000');
 
-            // Chạy lệnh Atomic Update trực tiếp (Chỉ cập nhật nếu ghế trống > 0)
-            const result = await client.query(
-                `UPDATE flights 
-                 SET available_seats = available_seats - 1 
-                 WHERE id = $1 AND available_seats > 0`,
+            // 🌟 SỬA 1: Bắt đầu một Transaction nghiêm ngặt
+            await client.query('BEGIN');
+
+            // 🌟 SỬA 2: Sử dụng SELECT FOR UPDATE NOWAIT để khóa cứng dòng chuyến bay này lại
+            // Thằng nào vào sau sẽ lập tức dính lỗi xung đột transaction, không cho xếp hàng chờ
+            const checkFlight = await client.query(
+                `SELECT available_seats FROM flights WHERE id = $1 FOR UPDATE NOWAIT`,
                 [flight_id]
             );
 
-            if (result.rowCount === 1) {
-                // Thêm bản ghi đặt vé vào bảng reservations để giữ tính toàn vẹn 5 bảng
-                await client.query(
-                    `INSERT INTO reservations (user_id, flight_id, seat_number, status) 
-                     VALUES ($1, $2, $3, 'confirmed')`,
-                    [user_id || 1, flight_id, seat_number || 'K8S-Stimulate']
-                );
+            if (checkFlight.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ success: false, message: 'Không tìm thấy chuyến bay!' });
+            }
 
-                return res.status(200).json({
-                    success: true,
-                    message: `Đặt vé thành công ở lượt thử thứ ${attempt}!`
-                });
-            } else {
+            const currentSeats = checkFlight.rows[0].available_seats;
+
+            // Kiểm tra nếu hết ghế thì hủy transaction ngay
+            if (currentSeats <= 0) {
+                await client.query('ROLLBACK');
                 return res.status(400).json({ success: false, message: 'Rất tiếc, chuyến bay đã hết ghế!' });
             }
+
+            // Tiến hành trừ ghế
+            await client.query(
+                `UPDATE flights SET available_seats = available_seats - 1 WHERE id = $1`,
+                [flight_id]
+            );
+
+            // Thêm bản ghi đặt vé
+            await client.query(
+                `INSERT INTO reservations (user_id, flight_id, seat_number, status) 
+                 VALUES ($1, $2, $3, 'confirmed')`,
+                [user_id || 1, flight_id, seat_number || 'K8S-Stimulate']
+            );
+
+            // 🌟 SỬA 3: Chốt giao dịch thành công toàn vẹn
+            await client.query('COMMIT');
+
+            return res.status(200).json({
+                success: true,
+                message: `Đặt vé thành công ở lượt thử thứ ${attempt}!`
+            });
+
         } catch (err) {
+            // Nếu có lỗi, phải ROLLBACK ngay để giải phóng bộ nhớ khóa dòng
+            if (client) { try { await client.query('ROLLBACK'); } catch (e) { } }
+
             console.error(`🚨 [SQL Stimulate - Lượt ${attempt}/${MAX_RETRIES}]:`, err.message);
 
+            // 🌟 SỬA 4: XÓA '40001' ra khỏi đây. 
+            // Khi dính lỗi xung đột dũ liệu 40001, ta muốn hệ thống trả lỗi thẳng về Frontend 
+            // để Frontend báo THẤT BẠI cho User B, giúp mô phỏng đúng kịch bản tranh chấp.
             const isRetryableError =
-                err.code === '40001' ||
-                err.code === '57P01' ||
-                err.code === '08006' ||
+                err.code === '57P01' || // Node bị crash
+                err.code === '08006' || // Mất kết nối mạng hoàn toàn
                 err.message.includes('timeout') ||
                 err.message.includes('terminated');
 
@@ -191,7 +216,14 @@ const BookFlightStimulate = async (req, res) => {
                 continue;
             }
 
-            return res.status(500).json({ success: false, message: 'Lỗi hệ thống phân tán: ' + err.message });
+            // Nếu dính lỗi 40001 (Xung đột ghi đồng thời) hoặc quá lượt retry, báo lỗi về Frontend
+            const isConflict = err.code === '40001' || err.message.includes('lock');
+            return res.status(isConflict ? 409 : 500).json({
+                success: false,
+                message: isConflict
+                    ? 'Xung đột giao dịch (Serializable Conflict) - Bạn đã chậm hơn một mili-giây!'
+                    : 'Lỗi hệ thống phân tán: ' + err.message
+            });
         } finally {
             if (client) {
                 try { client.release(); } catch (e) { }

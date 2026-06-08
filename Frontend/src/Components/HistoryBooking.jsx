@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 const HistoryBooking = ({ bookings, setBookings, hasLoadedHistory, setHasLoadedHistory }) => {
     const [loading, setLoading] = useState(!hasLoadedHistory);
     const [error, setError] = useState(null);
-    const BASE_URL = " http://127.0.0.1:60969";
+    const BASE_URL = "http://127.0.0.1:54725";
 
     const fetchHistory = async () => {
         setLoading(true);

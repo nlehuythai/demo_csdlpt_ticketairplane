@@ -64,7 +64,7 @@ const RaceSimulation = () => {
   const [logs, setLogs] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [winners, setWinners] = useState({ A: null, B: null });
-  const BASE_URL = "http://127.0.0.1:60969"; // Hãy chắc chắn port này trùng với minikube service/port-forward của bạn
+  const BASE_URL = "http://127.0.0.1:54725"; // Hãy chắc chắn port này trùng với minikube service/port-forward của bạn
 
   const generateRandomSeat = () => {
     const seatRows = ['A', 'B', 'C', 'D', 'E', 'F'];
