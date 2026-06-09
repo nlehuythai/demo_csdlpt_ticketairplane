@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Activity, Plane, Server, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
-
 const BookingDashboard = ({
     flights,
     setFlights,
@@ -12,9 +11,8 @@ const BookingDashboard = ({
     const [logs, setLogs] = useState([]);
     const [isAuto, setIsAuto] = useState(false);
     const [nodes, setNodes] = useState([]);
-    const BASE_URL = " http://127.0.0.1:54725";
+    const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
-    // 🌟 SỬ DỤNG REF ĐỂ PHÁ VỠ STALE CLOSURE CỦA SETINTERVAL
     const flightsRef = useRef(flights);
     const selectedFlightIdRef = useRef(selectedFlightId);
 
@@ -183,7 +181,7 @@ const BookingDashboard = ({
         <div className="min-h-screen bg-slate-900 text-white p-8 font-sans">
             <header className="mb-8 flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold text-blue-400">KILL-POD Dashboard</h1>
+                    <h1 className="text-3xl font-bold text-blue-400">Book tickets Dashboard</h1>
                     <p className="text-slate-400">Hệ thống phân tán: CockroachDB Cluster (5 Bảng chuẩn hóa)</p>
                 </div>
                 <div className="flex flex-wrap gap-4">

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Users, Zap, ShieldCheck, ShieldAlert, Loader2, RefreshCw } from 'lucide-react';
 
 // ==========================================
-// 1. COMPONENT CON: USER PANEL (Giữ nguyên giao diện đẹp của bạn)
+// 1. COMPONENT CON: USER PANEL 
 // ==========================================
 const UserPanel = ({ name, status, color, winnerName }) => {
   const statusStyles = {
@@ -56,7 +56,7 @@ const UserPanel = ({ name, status, color, winnerName }) => {
 };
 
 // ==========================================
-// 2. COMPONENT CHÍNH: RACE SIMULATION (Đã sửa lỗi đồng thì, cô lập luồng)
+// 2. COMPONENT CHÍNH: RACE SIMULATION
 // ==========================================
 const RaceSimulation = () => {
   const [statusA, setStatusA] = useState('idle');
@@ -64,38 +64,32 @@ const RaceSimulation = () => {
   const [logs, setLogs] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [winners, setWinners] = useState({ A: null, B: null });
-  const BASE_URL = "http://127.0.0.1:54725"; // Hãy chắc chắn port này trùng với minikube service/port-forward của bạn
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'; // Cổng kết nối K8s Cluster của bạn
 
   const generateRandomSeat = () => {
     const seatRows = ['A', 'B', 'C', 'D', 'E', 'F'];
     return Math.floor(Math.random() * 30 + 1) + seatRows[Math.floor(Math.random() * seatRows.length)];
   };
 
-  // 🛠️ CẢI TIẾN 1: Hàm gọi API phòng chống lỗi Parse JSON khi sập Cluster mạng
   const bookTicketRealAPI = async (displayName, userId, flightId) => {
     const randomSeat = generateRandomSeat();
-
-    // Khởi tạo bộ điều khiển hủy request
     const controller = new AbortController();
-    // Thiết lập tự động kích hoạt hủy sau 4000ms (4 giây)
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     try {
       const response = await fetch(`${BASE_URL}/api/tickets/book-flight-stimulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal, // ✅ SỬA LỖI 1: Gắn signal vào đây để fetch biết đường tự hủy khi quá hạn
+        signal: controller.signal,
         body: JSON.stringify({
-          flight_id: flightId.toString(), // Sử dụng tham số flightId truyền vào thay vì ép cứng '1'
+          flight_id: flightId.toString(),
           user_id: userId,
           seat_number: randomSeat
         })
       });
 
-      // Xóa bộ đếm thời gian ngay khi Backend trả dữ liệu về kịp lúc
       clearTimeout(timeoutId);
 
-      // Đọc dạng text trước để tránh crash khi response rỗng
       const resText = await response.text();
       let data = {};
       try {
@@ -113,21 +107,16 @@ const RaceSimulation = () => {
       };
 
     } catch (error) {
-      // Đảm bảo luôn xóa bộ đếm thời gian khi luồng rơi vào catch
       clearTimeout(timeoutId);
-
-      // ✅ SỬA LỖI 2: Bắt riêng trường hợp tự hủy do quá thời gian chờ (Timeout)
       if (error.name === 'AbortError') {
         return {
           user: displayName,
           seat: randomSeat,
           success: false,
-          status: 408, // Mã lỗi Request Timeout tiêu chuẩn
-          message: "Cơ sở dữ liệu phân tán dính khóa dòng (Lock Wait Timeout) - Frontend đã tự hủy request!"
+          status: 408,
+          message: "Cơ sở dữ liệu phân tán dính khóa dòng (Lock Wait Timeout)!"
         };
       }
-
-      // Trả về lỗi mất kết nối hệ thống thông thường
       return {
         user: displayName,
         seat: randomSeat,
@@ -138,29 +127,27 @@ const RaceSimulation = () => {
     }
   };
 
-  // 🛠️ CẢI TIẾN 2: Tách biệt hoàn toàn luồng xử lý UI (Xong trước render trước, không đợi nhau)
+  // 🌟 CẬP NHẬT CHIẾN THUẬT: Đảo thứ tự ngẫu nhiên để xử lý tranh chấp 2 người thực tế
+  // 🌟 CẬP NHẬT CHIẾN THUẬT: Ép buộc phân phối mạng ngẫu nhiên 100% bằng cơ chế rẽ nhánh
   const simulateConflict = async () => {
     setIsSimulating(true);
     setStatusA('loading');
     setStatusB('loading');
     setWinners({ A: null, B: null });
 
-    const TARGET_FLIGHT_ID = "1"; // Để dạng chuỗi đồng bộ với database số lớn
+    const TARGET_FLIGHT_ID = "1";
 
     setLogs(prev => [{
       time: new Date().toLocaleTimeString(),
-      msg: "🚀 Hệ thống: Phát lệnh TRANH CHẤP ĐỒNG THỜI (Concurrent Requests) lên CockroachDB...",
+      msg: "🎲 Chaos Lab: Khởi động thuật toán tung đồng xu phân bổ luồng xử lý mạng...",
       type: 'info'
     }, ...prev]);
 
-    // Hàm thực thi đơn lẻ, tự cập nhật UI độc lập ngay khi nhận được tín hiệu mạng
+    // Luồng xử lý UI độc lập cho từng User
     const executeUserRequest = async (displayName, userId, setStatus, winnerKey) => {
       const res = await bookTicketRealAPI(displayName, userId, TARGET_FLIGHT_ID);
-
-      // Đảm bảo dữ liệu không bị undefined
       const safeRes = res || { success: false, message: "Lỗi treo hệ thống mạng", user: displayName, seat: "N/A", status: 500 };
 
-      // Luồng này chạy xong là cập nhật UI ngay lập tức cho User đó!
       setStatus(safeRes.success ? 'success' : 'error');
 
       if (safeRes.success) {
@@ -170,28 +157,40 @@ const RaceSimulation = () => {
         }));
       }
 
-      // Đẩy log realtime lên màn hình Console Log phía dưới ngay khi có kết quả
       setLogs(prev => [{
         time: new Date().toLocaleTimeString(),
         msg: safeRes.success
-          ? `✅ ${safeRes.user}: ĐẶT VÉ THÀNH CÔNG! Đã chốt giữ chỗ ghế ${safeRes.seat} trên CockroachDB.`
-          : `⚠️ ${safeRes.user}: THẤT BẠI - ${safeRes.message} (Mã phản hồi: ${safeRes.status})`,
+          ? `✅ ${safeRes.user}: ĐẶT VÉ THÀNH CÔNG! Chiếm Lock gốc trên CockroachDB.`
+          : safeRes.status === 409
+            ? `⚠️ ${safeRes.user}: THẤT BẠI - Xung đột giao dịch (Bị chặn bởi FOR UPDATE NOWAIT).`
+            : `⚠️ ${safeRes.user}: THẤT BẠI - ${safeRes.message} (Mã lỗi: ${safeRes.status})`,
         type: safeRes.success ? 'success' : 'error'
       }, ...prev]);
 
       return safeRes;
     };
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const isUserAFirst = Math.random() < 0.5;
 
     try {
-      // 🌟 Điểm mấu chốt: Bắn đồng thời ra mạng cùng một mili-giây, nhưng bên trong tự render độc lập
-      await Promise.all([
-        executeUserRequest('Huy Thai (User A)', 1, setStatusA, 'A'),
-        executeUserRequest('Guest (User B)', 2, setStatusB, 'B')
-      ]);
+      if (isUserAFirst) {
+        setLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: "✈️ Luồng ưu tiên microsecond: Huy Thai (User A) phóng trước...", type: 'info' }, ...prev]);
+
+        await Promise.all([
+          executeUserRequest('Huy Thai (User A)', 1, setStatusA, 'A'),
+          (async () => { await delay(5); return executeUserRequest('Guest (User B)', 2, setStatusB, 'B'); })()
+        ]);
+      } else {
+        setLogs(prev => [{ time: new Date().toLocaleTimeString(), msg: "✈️ Luồng ưu tiên microsecond: Guest (User B) phóng trước...", type: 'info' }, ...prev]);
+        await Promise.all([
+          executeUserRequest('Guest (User B)', 2, setStatusB, 'B'),
+          (async () => { await delay(5); return executeUserRequest('Huy Thai (User A)', 1, setStatusA, 'A'); })()
+        ]);
+      }
     } catch (err) {
-      console.error("Lỗi chí mạng khi chạy mô phỏng cuộc đua:", err);
+      console.error("Lỗi khi chạy mô phỏng cuộc đua:", err);
     } finally {
-      // Đảm bảo nút bấm luôn luôn giải phóng kể cả khi cluster bị quật sập
       setIsSimulating(false);
     }
   };

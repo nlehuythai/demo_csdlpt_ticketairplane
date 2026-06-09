@@ -15,7 +15,7 @@ const Sidebar = () => {
         <div className="h-screen w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed left-0 top-0">
             <div className="p-6">
                 <h1 className="text-xl font-bold text-blue-400 flex items-center gap-2">
-                    <Plane className="rotate-45" /> Chaos Knights
+                    <Plane className="rotate-45" /> Airplane Ticket Dashboard
                 </h1>
             </div>
 
