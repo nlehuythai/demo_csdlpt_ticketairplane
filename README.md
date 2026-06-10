@@ -15,22 +15,28 @@ Hệ thống mô phỏng và kiểm thử khả năng chịu lỗi (Resilience),
 ## ⚙️ 2. Hướng Dẫn Cài Đặt Khởi Chạy
 
 ### Bước 2.1: Khởi động Minikube & Cấu hình Docker Env
+
 ```bash
+# chạy docker compose minikube lên
 # Khởi động cụm Minikube 
-minikube start 
-Bước 2.2: Triển khai Cấu trúc Database Phân tán 
-Bash
+minikube start --driver=docker --cpus=4 --memory=8192 --disk-size=20g
+```
+### Bước 2.2: Triển khai Cấu trúc Database Phân tán 
+```bash
 # Áp dụng cấu hình StatefulSet cho CockroachDB Cluster
 kubectl apply -f roach-k8s.yaml
 
 # Khởi tạo cụm dữ liệu phân tán (Chỉ chạy 1 lần)
-kubectl exec -it cockroachdb-0 -- ./cockroach init
+kubectl exec -it roachdb-0 -- ./cockroach init
 
 # Đăng nhập SQL Shell để tạo database và mock data chuyến bay
-kubectl exec -it cockroachdb-0 -- ./cockroach sql --insecure
+kubectl exec -it roachdb-0 -- ./cockroach sql --insecure
 # sau đó thêm database vào
-docker build -t backend-service:v2 ./backend
+cd ./backend
+docker build -t backend-service:v2 
+cd ..
 kubectl apply -f backend-deploy.yaml
 #Tiến hành Port-Forward để truy cập ứng dụng dưới máy Local
 minikube service backend-service url
-#Dùng url để liên kết gọi api từ frontend về backend
+#Dùng url để liên kết gọi api từ frontend về backend gắn vào file .env.
+
